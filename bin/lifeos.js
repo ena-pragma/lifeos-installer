@@ -131,6 +131,38 @@ function gitSummary(cwd) {
   return `${branch}@${rev}`;
 }
 
+const GENERATED_FILES = new Set(['.lifeos-heartbeat.json']);
+
+function dirtyFiles(cwd) {
+  const res = run('git', ['status', '--porcelain'], { cwd, capture: true, print: false, optional: true });
+  if (res.status !== 0) return [];
+  return String(res.stdout || '')
+    .split('\n')
+    .map(line => line.trimEnd())
+    .filter(Boolean)
+    .map(line => {
+      const file = line.slice(3).trim();
+      return file.includes(' -> ') ? file.split(' -> ').pop().trim() : file;
+    });
+}
+
+function prepareUpdateWorktree(cwd) {
+  const dirty = dirtyFiles(cwd);
+  if (!dirty.length) return;
+  const unsafe = dirty.filter(file => !GENERATED_FILES.has(file));
+  if (unsafe.length) {
+    die(`LifeOS has local changes I will not overwrite: ${unsafe.join(', ')}. Commit, stash, or remove them, then rerun \`lifeos up\`.`);
+  }
+  warn(`Discarding generated runtime changes before update: ${dirty.join(', ')}`);
+  for (const file of dirty) {
+    run('git', ['restore', '--staged', '--worktree', '--', file], { cwd, optional: true, print: false });
+    const full = path.join(cwd, file);
+    if (fs.existsSync(full) && gitValue(cwd, ['ls-files', '--others', '--exclude-standard', '--', file])) {
+      fs.rmSync(full, { force: true });
+    }
+  }
+}
+
 function ensureSource(opts) {
   if (!fs.existsSync(opts.dir)) {
     step(`Cloning LifeOS ${opts.channel}`);
@@ -150,6 +182,8 @@ function ensureSource(opts) {
   const before = gitSummary(opts.dir);
   step(`Updating LifeOS ${opts.channel}`);
   ok(`current: ${before}`);
+  run('git', ['remote', 'set-url', 'origin', opts.repo], { cwd: opts.dir, optional: true, print: false });
+  prepareUpdateWorktree(opts.dir);
   run('git', ['fetch', 'origin', opts.channel, '--tags'], { cwd: opts.dir });
   run('git', ['checkout', opts.channel], { cwd: opts.dir });
   run('git', ['pull', '--ff-only', 'origin', opts.channel], { cwd: opts.dir });
