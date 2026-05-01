@@ -118,6 +118,11 @@ function preflight() {
   }
   if (has('pi')) ok('pi found');
   else warn('pi not found. bin/up will try to install pi.dev, or terminals may not auto-launch an agent.');
+  if (has('gh')) {
+    const gh = run('gh', ['auth', 'status', '-h', 'github.com'], { capture: true, print: false, optional: true });
+    if (gh.status === 0) ok('GitHub auth found');
+    else warn('GitHub auth is missing or expired. Private repo installs need: gh auth login -h github.com && gh auth setup-git');
+  }
 }
 
 function gitValue(cwd, args) {
@@ -146,6 +151,10 @@ function dirtyFiles(cwd) {
     });
 }
 
+function privateRepoHelp() {
+  return 'Could not access ena-pragma/lifeos. Make sure this machine has org repo access, then run: gh auth login -h github.com && gh auth setup-git';
+}
+
 function prepareUpdateWorktree(cwd) {
   const dirty = dirtyFiles(cwd);
   if (!dirty.length) return;
@@ -169,7 +178,7 @@ function ensureSource(opts) {
     fs.mkdirSync(path.dirname(opts.dir), { recursive: true });
     const cloned = run('git', ['clone', '--branch', opts.channel, opts.repo, opts.dir], { optional: true });
     if (cloned.status !== 0) {
-      die(`Could not clone LifeOS. If the repo is private, ask Carl for ena-pragma/lifeos access, then run \`gh auth login\` or use \`--repo git@github.com:ena-pragma/lifeos.git\` with a GitHub SSH key.`);
+      die(privateRepoHelp());
     }
     ok(`cloned ${gitSummary(opts.dir)} to ${opts.dir}`);
     return { cloned: true, before: '', after: gitSummary(opts.dir) };
@@ -184,7 +193,8 @@ function ensureSource(opts) {
   ok(`current: ${before}`);
   run('git', ['remote', 'set-url', 'origin', opts.repo], { cwd: opts.dir, optional: true, print: false });
   prepareUpdateWorktree(opts.dir);
-  run('git', ['fetch', 'origin', opts.channel, '--tags'], { cwd: opts.dir });
+  const fetched = run('git', ['fetch', 'origin', opts.channel, '--tags'], { cwd: opts.dir, optional: true });
+  if (fetched.status !== 0) die(privateRepoHelp());
   run('git', ['checkout', opts.channel], { cwd: opts.dir });
   run('git', ['pull', '--ff-only', 'origin', opts.channel], { cwd: opts.dir });
   const after = gitSummary(opts.dir);
