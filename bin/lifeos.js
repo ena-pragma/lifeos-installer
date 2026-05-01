@@ -124,7 +124,10 @@ function ensureSource(opts) {
   if (!fs.existsSync(opts.dir)) {
     step(`Cloning LifeOS ${opts.channel}`);
     fs.mkdirSync(path.dirname(opts.dir), { recursive: true });
-    run('git', ['clone', '--branch', opts.channel, opts.repo, opts.dir]);
+    const cloned = run('git', ['clone', '--branch', opts.channel, opts.repo, opts.dir], { optional: true });
+    if (cloned.status !== 0) {
+      die(`Could not clone LifeOS. If the repo is private, first run \`gh auth login\` or use \`--repo git@github.com:XXGooseOnDaRuuXX/lifeos.git\` with a GitHub SSH key.`);
+    }
     ok(`cloned to ${opts.dir}`);
     return;
   }
