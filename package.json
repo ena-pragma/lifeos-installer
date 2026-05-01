@@ -13,6 +13,13 @@
     "check": "node --check bin/lifeos.js",
     "smoke": "node bin/lifeos.js --help && node bin/lifeos.js path"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ena-pragma/lifeos-installer.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18"
   },

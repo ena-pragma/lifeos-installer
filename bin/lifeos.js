@@ -120,6 +120,17 @@ function preflight() {
   else warn('pi not found. bin/up will try to install pi.dev, or terminals may not auto-launch an agent.');
 }
 
+function gitValue(cwd, args) {
+  const res = run('git', args, { cwd, capture: true, print: false, optional: true });
+  return res.status === 0 ? String(res.stdout || '').trim() : '';
+}
+
+function gitSummary(cwd) {
+  const branch = gitValue(cwd, ['branch', '--show-current']) || 'detached';
+  const rev = gitValue(cwd, ['rev-parse', '--short', 'HEAD']) || 'unknown';
+  return `${branch}@${rev}`;
+}
+
 function ensureSource(opts) {
   if (!fs.existsSync(opts.dir)) {
     step(`Cloning LifeOS ${opts.channel}`);
@@ -128,19 +139,23 @@ function ensureSource(opts) {
     if (cloned.status !== 0) {
       die(`Could not clone LifeOS. If the repo is private, ask Carl for ena-pragma/lifeos access, then run \`gh auth login\` or use \`--repo git@github.com:ena-pragma/lifeos.git\` with a GitHub SSH key.`);
     }
-    ok(`cloned to ${opts.dir}`);
-    return;
+    ok(`cloned ${gitSummary(opts.dir)} to ${opts.dir}`);
+    return { cloned: true, before: '', after: gitSummary(opts.dir) };
   }
 
   if (!fs.existsSync(path.join(opts.dir, '.git'))) {
     die(`${opts.dir} exists but is not a git checkout. Move it aside or pass --dir.`);
   }
 
+  const before = gitSummary(opts.dir);
   step(`Updating LifeOS ${opts.channel}`);
+  ok(`current: ${before}`);
   run('git', ['fetch', 'origin', opts.channel, '--tags'], { cwd: opts.dir });
   run('git', ['checkout', opts.channel], { cwd: opts.dir });
   run('git', ['pull', '--ff-only', 'origin', opts.channel], { cwd: opts.dir });
-  ok('source current');
+  const after = gitSummary(opts.dir);
+  ok(before === after ? `already current: ${after}` : `updated: ${before} → ${after}`);
+  return { cloned: false, before, after };
 }
 
 function lifeosEnv(opts) {
@@ -152,11 +167,12 @@ function lifeosEnv(opts) {
 
 function install(opts) {
   preflight();
-  ensureSource(opts);
-  step('Starting LifeOS');
+  const source = ensureSource(opts);
+  step(source.cloned ? 'Starting LifeOS' : 'Restarting LifeOS');
   run('bash', ['bin/up'], { cwd: opts.dir, env: lifeosEnv(opts) });
   if (!opts.skipDoctor) doctor(opts);
   console.log(`\nLifeOS is ready: http://127.0.0.1:${opts.port}`);
+  console.log(`Installed source: ${source.after}`);
   console.log('Next: run `lifeos open` or open the URL in your browser.');
 }
 
