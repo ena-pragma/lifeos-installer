@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const DEFAULT_REPO = 'https://github.com/XXGooseOnDaRuuXX/lifeos.git';
+const DEFAULT_REPO = 'https://github.com/ena-pragma/lifeos.git';
 const DEFAULT_CHANNEL = 'stable';
 const DEFAULT_DIR = path.join(os.homedir(), '.lifeos', 'app');
 const DEFAULT_LABEL = 'com.enapragma.lifeos';
@@ -126,7 +126,7 @@ function ensureSource(opts) {
     fs.mkdirSync(path.dirname(opts.dir), { recursive: true });
     const cloned = run('git', ['clone', '--branch', opts.channel, opts.repo, opts.dir], { optional: true });
     if (cloned.status !== 0) {
-      die(`Could not clone LifeOS. If the repo is private, first run \`gh auth login\` or use \`--repo git@github.com:XXGooseOnDaRuuXX/lifeos.git\` with a GitHub SSH key.`);
+      die(`Could not clone LifeOS. If the repo is private, ask Carl for ena-pragma/lifeos access, then run \`gh auth login\` or use \`--repo git@github.com:ena-pragma/lifeos.git\` with a GitHub SSH key.`);
     }
     ok(`cloned to ${opts.dir}`);
     return;
